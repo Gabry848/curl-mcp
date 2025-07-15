@@ -21,6 +21,29 @@ Un server MCP (Model Context Protocol) che fornisce strumenti HTTP/HTTPS complet
 npm install
 ```
 
+### Installazione globale per utilizzo con npx
+
+Per utilizzare il server con npx, puoi:
+
+1. **Installare localmente e linkare:**
+
+```bash
+npm link
+```
+
+2. **Pubblicare su npm (se vuoi condividerlo):**
+
+```bash
+npm publish
+```
+
+3. **Utilizzare direttamente da una cartella locale:**
+
+```bash
+npm pack
+npm install -g ./curl-mcp-server-1.0.0.tgz
+```
+
 ## Strumenti Disponibili
 
 ### 1. http_get
@@ -138,9 +161,26 @@ Testa i metodi di autenticazione
 
 ## Configurazione per Client MCP
 
-### Per Claude Desktop
+### Per Claude Desktop (con npx)
 
-Aggiungi questa configurazione al file di configurazione di Claude Desktop:
+Aggiungi questa configurazione al file di configurazione di Claude Desktop per utilizzare il server tramite npx:
+
+```json
+{
+  "mcpServers": {
+    "curl-mcp": {
+      "command": "npx",
+      "args": [
+        "curl-mcp-server"
+      ]
+    }
+  }
+}
+```
+
+### Per Claude Desktop (locale)
+
+Aggiungi questa configurazione al file di configurazione di Claude Desktop per utilizzare il server locale:
 
 ```json
 {
