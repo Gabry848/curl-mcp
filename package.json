@@ -4,6 +4,9 @@
   "description": "MCP server with HTTP/HTTPS capabilities using curl",
   "main": "index.js",
   "type": "module",
+  "bin": {
+    "curl-mcp-server": "./index.js"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"
