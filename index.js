@@ -7,10 +7,10 @@ import {
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ReadResourceRequestSchema,
+  InitializeRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { spawn } from "child_process";
-import { promisify } from "util";
 
 // Create an MCP server
 const server = new Server({
@@ -26,7 +26,7 @@ const server = new Server({
 // Helper function to execute curl commands
 async function executeCurl(curlArgs) {
   return new Promise((resolve, reject) => {
-    const curl = spawn('curl', curlArgs, { shell: true });
+    const curl = spawn('curl', curlArgs);
     
     let stdout = '';
     let stderr = '';
@@ -98,6 +98,21 @@ const authSchema = z.object({
   header: z.string().optional().describe("Custom authorization header (e.g., 'Authorization: Custom token123')")
 }).optional().describe("Authentication configuration");
 
+// Handle initialize request
+server.setRequestHandler(InitializeRequestSchema, async (request) => {
+  return {
+    protocolVersion: "2024-11-05",
+    capabilities: {
+      tools: {},
+      resources: {}
+    },
+    serverInfo: {
+      name: "curl-mcp-server",
+      version: "1.0.0"
+    }
+  };
+});
+
 // Define tool schemas
 const httpGetSchema = z.object({
   url: z.string().describe("The URL to make the GET request to"),
@@ -105,7 +120,8 @@ const httpGetSchema = z.object({
   auth: authSchema,
   timeout: z.number().optional().describe("Request timeout in seconds (default: 30)"),
   followRedirects: z.boolean().optional().describe("Follow redirects (default: true)"),
-  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)")
+  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)"),
+  cookieJar: z.string().optional().describe("Path to cookie jar file for session persistence")
 });
 
 const httpPostSchema = z.object({
@@ -116,7 +132,8 @@ const httpPostSchema = z.object({
   contentType: z.string().optional().describe("Content-Type header (default: application/json)"),
   timeout: z.number().optional().describe("Request timeout in seconds (default: 30)"),
   followRedirects: z.boolean().optional().describe("Follow redirects (default: true)"),
-  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)")
+  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)"),
+  cookieJar: z.string().optional().describe("Path to cookie jar file for session persistence")
 });
 
 const httpPutSchema = z.object({
@@ -127,7 +144,8 @@ const httpPutSchema = z.object({
   contentType: z.string().optional().describe("Content-Type header (default: application/json)"),
   timeout: z.number().optional().describe("Request timeout in seconds (default: 30)"),
   followRedirects: z.boolean().optional().describe("Follow redirects (default: true)"),
-  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)")
+  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)"),
+  cookieJar: z.string().optional().describe("Path to cookie jar file for session persistence")
 });
 
 const httpDeleteSchema = z.object({
@@ -136,7 +154,20 @@ const httpDeleteSchema = z.object({
   auth: authSchema,
   timeout: z.number().optional().describe("Request timeout in seconds (default: 30)"),
   followRedirects: z.boolean().optional().describe("Follow redirects (default: true)"),
-  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)")
+  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)"),
+  cookieJar: z.string().optional().describe("Path to cookie jar file for session persistence")
+});
+
+const httpPatchSchema = z.object({
+  url: z.string().describe("The URL to make the PATCH request to"),
+  data: z.string().optional().describe("Request body data"),
+  headers: z.record(z.string()).optional().describe("Optional headers to include"),
+  auth: authSchema,
+  contentType: z.string().optional().describe("Content-Type header (default: application/json)"),
+  timeout: z.number().optional().describe("Request timeout in seconds (default: 30)"),
+  followRedirects: z.boolean().optional().describe("Follow redirects (default: true)"),
+  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)"),
+  cookieJar: z.string().optional().describe("Path to cookie jar file for session persistence")
 });
 
 const httpHeadSchema = z.object({
@@ -145,7 +176,8 @@ const httpHeadSchema = z.object({
   auth: authSchema,
   timeout: z.number().optional().describe("Request timeout in seconds (default: 30)"),
   followRedirects: z.boolean().optional().describe("Follow redirects (default: true)"),
-  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)")
+  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)"),
+  cookieJar: z.string().optional().describe("Path to cookie jar file for session persistence")
 });
 
 const curlCustomSchema = z.object({
@@ -159,7 +191,8 @@ const httpUploadSchema = z.object({
   headers: z.record(z.string()).optional().describe("Optional headers to include"),
   auth: authSchema,
   timeout: z.number().optional().describe("Request timeout in seconds (default: 60)"),
-  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)")
+  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)"),
+  cookieJar: z.string().optional().describe("Path to cookie jar file for session persistence")
 });
 
 const httpDownloadSchema = z.object({
@@ -169,7 +202,8 @@ const httpDownloadSchema = z.object({
   auth: authSchema,
   timeout: z.number().optional().describe("Request timeout in seconds (default: 300)"),
   followRedirects: z.boolean().optional().describe("Follow redirects (default: true)"),
-  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)")
+  insecure: z.boolean().optional().describe("Allow insecure SSL connections (default: false)"),
+  cookieJar: z.string().optional().describe("Path to cookie jar file for session persistence")
 });
 
 const authTestSchema = z.object({
@@ -294,6 +328,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               },
               description: "Authentication configuration"
             },
+            timeout: { type: "number", description: "Request timeout in seconds (default: 30)" },
+            followRedirects: { type: "boolean", description: "Follow redirects (default: true)" },
+            insecure: { type: "boolean", description: "Allow insecure SSL connections (default: false)" }
+          },
+          required: ["url"]
+        }
+      },
+      {
+        name: "http_patch",
+        description: "Perform an HTTP PATCH request using curl",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "The URL to make the PATCH request to" },
+            data: { type: "string", description: "Request body data" },
+            headers: { type: "object", additionalProperties: { type: "string" }, description: "Optional headers to include" },
+            auth: {
+              type: "object",
+              properties: {
+                type: { type: "string", enum: ["bearer", "basic", "digest", "oauth2", "api_key", "custom"] },
+                token: { type: "string", description: "Bearer token or OAuth2 token" },
+                username: { type: "string", description: "Username for basic/digest auth" },
+                password: { type: "string", description: "Password for basic/digest auth" },
+                key: { type: "string", description: "API key header name" },
+                value: { type: "string", description: "API key value" },
+                header: { type: "string", description: "Custom authorization header" }
+              },
+              description: "Authentication configuration"
+            },
+            contentType: { type: "string", description: "Content-Type header (default: application/json)" },
             timeout: { type: "number", description: "Request timeout in seconds (default: 30)" },
             followRedirects: { type: "boolean", description: "Follow redirects (default: true)" },
             insecure: { type: "boolean", description: "Allow insecure SSL connections (default: false)" }
@@ -436,13 +500,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "http_get": {
-        const { url, headers, auth, timeout = 30, followRedirects = true, insecure = false } = args;
-        const curlArgs = ['-s', '-w', '\\n\\nHTTP_CODE:%{http_code}\\nTIME_TOTAL:%{time_total}'];
-        
+        const { url, headers, auth, timeout = 30, followRedirects = true, insecure = false, cookieJar } = args;
+        const curlArgs = ['-s', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}'];
+
         if (followRedirects) curlArgs.push('-L');
         if (insecure) curlArgs.push('-k');
         if (timeout) curlArgs.push('--max-time', timeout.toString());
-        
+        if (cookieJar) {
+          curlArgs.push('-b', cookieJar, '-c', cookieJar);
+        }
+
         addAuthToCurl(curlArgs, auth);
         
         if (headers) {
@@ -460,20 +527,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "http_post": {
-        const { url, data, headers, auth, contentType = "application/json", timeout = 30, followRedirects = true, insecure = false } = args;
-        const curlArgs = ['-s', '-w', '\\n\\nHTTP_CODE:%{http_code}\\nTIME_TOTAL:%{time_total}', '-X', 'POST'];
-        
+        const { url, data, headers, auth, contentType = "application/json", timeout = 30, followRedirects = true, insecure = false, cookieJar } = args;
+        const curlArgs = ['-s', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}', '-X', 'POST'];
+
         if (followRedirects) curlArgs.push('-L');
         if (insecure) curlArgs.push('-k');
         if (timeout) curlArgs.push('--max-time', timeout.toString());
-        
+        if (cookieJar) {
+          curlArgs.push('-b', cookieJar, '-c', cookieJar);
+        }
+
         addAuthToCurl(curlArgs, auth);
-        
+
         if (data) {
           curlArgs.push('-d', data);
-          curlArgs.push('-H', `Content-Type: ${contentType}`);
+          // Only add Content-Type if not already present in custom headers
+          const hasContentType = headers && Object.keys(headers).some(key => key.toLowerCase() === 'content-type');
+          if (!hasContentType) {
+            curlArgs.push('-H', `Content-Type: ${contentType}`);
+          }
         }
-        
+
         if (headers) {
           for (const [key, value] of Object.entries(headers)) {
             curlArgs.push('-H', `${key}: ${value}`);
@@ -489,20 +563,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "http_put": {
-        const { url, data, headers, auth, contentType = "application/json", timeout = 30, followRedirects = true, insecure = false } = args;
-        const curlArgs = ['-s', '-w', '\\n\\nHTTP_CODE:%{http_code}\\nTIME_TOTAL:%{time_total}', '-X', 'PUT'];
-        
+        const { url, data, headers, auth, contentType = "application/json", timeout = 30, followRedirects = true, insecure = false, cookieJar } = args;
+        const curlArgs = ['-s', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}', '-X', 'PUT'];
+
         if (followRedirects) curlArgs.push('-L');
         if (insecure) curlArgs.push('-k');
         if (timeout) curlArgs.push('--max-time', timeout.toString());
-        
+        if (cookieJar) {
+          curlArgs.push('-b', cookieJar, '-c', cookieJar);
+        }
+
         addAuthToCurl(curlArgs, auth);
-        
+
         if (data) {
           curlArgs.push('-d', data);
-          curlArgs.push('-H', `Content-Type: ${contentType}`);
+          // Only add Content-Type if not already present in custom headers
+          const hasContentType = headers && Object.keys(headers).some(key => key.toLowerCase() === 'content-type');
+          if (!hasContentType) {
+            curlArgs.push('-H', `Content-Type: ${contentType}`);
+          }
         }
-        
+
         if (headers) {
           for (const [key, value] of Object.entries(headers)) {
             curlArgs.push('-H', `${key}: ${value}`);
@@ -518,23 +599,62 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "http_delete": {
-        const { url, headers, auth, timeout = 30, followRedirects = true, insecure = false } = args;
-        const curlArgs = ['-s', '-w', '\\n\\nHTTP_CODE:%{http_code}\\nTIME_TOTAL:%{time_total}', '-X', 'DELETE'];
-        
+        const { url, headers, auth, timeout = 30, followRedirects = true, insecure = false, cookieJar } = args;
+        const curlArgs = ['-s', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}', '-X', 'DELETE'];
+
         if (followRedirects) curlArgs.push('-L');
         if (insecure) curlArgs.push('-k');
         if (timeout) curlArgs.push('--max-time', timeout.toString());
-        
+        if (cookieJar) {
+          curlArgs.push('-b', cookieJar, '-c', cookieJar);
+        }
+
         addAuthToCurl(curlArgs, auth);
-        
+
         if (headers) {
           for (const [key, value] of Object.entries(headers)) {
             curlArgs.push('-H', `${key}: ${value}`);
           }
         }
-        
+
         curlArgs.push(url);
-        
+
+        const result = await executeCurl(curlArgs);
+        return {
+          content: [{ type: "text", text: result }]
+        };
+      }
+
+      case "http_patch": {
+        const { url, data, headers, auth, contentType = "application/json", timeout = 30, followRedirects = true, insecure = false, cookieJar } = args;
+        const curlArgs = ['-s', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}', '-X', 'PATCH'];
+
+        if (followRedirects) curlArgs.push('-L');
+        if (insecure) curlArgs.push('-k');
+        if (timeout) curlArgs.push('--max-time', timeout.toString());
+        if (cookieJar) {
+          curlArgs.push('-b', cookieJar, '-c', cookieJar);
+        }
+
+        addAuthToCurl(curlArgs, auth);
+
+        if (data) {
+          curlArgs.push('-d', data);
+          // Only add Content-Type if not already present in custom headers
+          const hasContentType = headers && Object.keys(headers).some(key => key.toLowerCase() === 'content-type');
+          if (!hasContentType) {
+            curlArgs.push('-H', `Content-Type: ${contentType}`);
+          }
+        }
+
+        if (headers) {
+          for (const [key, value] of Object.entries(headers)) {
+            curlArgs.push('-H', `${key}: ${value}`);
+          }
+        }
+
+        curlArgs.push(url);
+
         const result = await executeCurl(curlArgs);
         return {
           content: [{ type: "text", text: result }]
@@ -542,13 +662,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "http_head": {
-        const { url, headers, auth, timeout = 30, followRedirects = true, insecure = false } = args;
-        const curlArgs = ['-s', '-I', '-w', '\\n\\nHTTP_CODE:%{http_code}\\nTIME_TOTAL:%{time_total}'];
-        
+        const { url, headers, auth, timeout = 30, followRedirects = true, insecure = false, cookieJar } = args;
+        const curlArgs = ['-s', '-I', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}'];
+
         if (followRedirects) curlArgs.push('-L');
         if (insecure) curlArgs.push('-k');
         if (timeout) curlArgs.push('--max-time', timeout.toString());
-        
+        if (cookieJar) {
+          curlArgs.push('-b', cookieJar, '-c', cookieJar);
+        }
+
         addAuthToCurl(curlArgs, auth);
         
         if (headers) {
@@ -574,12 +697,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "http_upload": {
-        const { url, filePath, fieldName = "file", headers, auth, timeout = 60, insecure = false } = args;
-        const curlArgs = ['-s', '-w', '\\n\\nHTTP_CODE:%{http_code}\\nTIME_TOTAL:%{time_total}'];
-        
+        const { url, filePath, fieldName = "file", headers, auth, timeout = 60, insecure = false, cookieJar } = args;
+        const curlArgs = ['-s', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}'];
+
         if (insecure) curlArgs.push('-k');
         if (timeout) curlArgs.push('--max-time', timeout.toString());
-        
+        if (cookieJar) {
+          curlArgs.push('-b', cookieJar, '-c', cookieJar);
+        }
+
         addAuthToCurl(curlArgs, auth);
         
         curlArgs.push('-F', `${fieldName}=@${filePath}`);
@@ -599,13 +725,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "http_download": {
-        const { url, outputPath, headers, auth, timeout = 300, followRedirects = true, insecure = false } = args;
-        const curlArgs = ['-s', '-w', '\\n\\nHTTP_CODE:%{http_code}\\nTIME_TOTAL:%{time_total}', '-o', outputPath];
-        
+        const { url, outputPath, headers, auth, timeout = 300, followRedirects = true, insecure = false, cookieJar } = args;
+        const curlArgs = ['-s', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}', '-o', outputPath];
+
         if (followRedirects) curlArgs.push('-L');
         if (insecure) curlArgs.push('-k');
         if (timeout) curlArgs.push('--max-time', timeout.toString());
-        
+        if (cookieJar) {
+          curlArgs.push('-b', cookieJar, '-c', cookieJar);
+        }
+
         addAuthToCurl(curlArgs, auth);
         
         if (headers) {
@@ -624,7 +753,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "auth_test": {
         const { url, auth, timeout = 30, insecure = false } = args;
-        const curlArgs = ['-s', '-w', '\\n\\nHTTP_CODE:%{http_code}\\nTIME_TOTAL:%{time_total}', '-v'];
+        const curlArgs = ['-s', '-w', '\n\nHTTP_CODE:%{http_code}\nTIME_TOTAL:%{time_total}', '-v'];
         
         if (insecure) curlArgs.push('-k');
         if (timeout) curlArgs.push('--max-time', timeout.toString());
@@ -688,9 +817,10 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const infoMap = {
     "http://info/tools": `Available HTTP tools:
 - http_get: Perform GET requests
-- http_post: Perform POST requests  
+- http_post: Perform POST requests
 - http_put: Perform PUT requests
 - http_delete: Perform DELETE requests
+- http_patch: Perform PATCH requests
 - http_head: Perform HEAD requests
 - curl_custom: Execute custom curl commands
 - http_upload: Upload files via HTTP POST

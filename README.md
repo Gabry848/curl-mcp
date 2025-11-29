@@ -4,9 +4,10 @@ Un server MCP (Model Context Protocol) che fornisce strumenti HTTP/HTTPS complet
 
 ## Caratteristiche
 
-- **Richieste HTTP complete**: GET, POST, PUT, DELETE, HEAD
+- **Richieste HTTP complete**: GET, POST, PUT, PATCH, DELETE, HEAD
 - **Autenticazione multipla**: Bearer Token, Basic Auth, Digest Auth, OAuth2, API Key, Custom Headers
 - **Upload e Download di file**: Caricamento e scaricamento di file tramite HTTP
+- **Cookie Jar**: Gestione persistente dei cookie per mantenere sessioni HTTP
 - **Comandi curl personalizzati**: Esecuzione di comandi curl con controllo completo
 - **Test di autenticazione**: Verifica delle credenziali di accesso
 - **Configurazione avanzata**: Timeout, redirect, SSL/TLS, headers personalizzati
@@ -50,51 +51,57 @@ npm install -g ./curl-mcp-server-1.0.0.tgz
 
 Esegue richieste HTTP GET
 
-- **Parametri**: url, headers, auth, timeout, followRedirects, insecure
+- **Parametri**: url, headers, auth, timeout, followRedirects, insecure, cookieJar
 
 ### 2. http_post
 
 Esegue richieste HTTP POST
 
-- **Parametri**: url, data, headers, auth, contentType, timeout, followRedirects, insecure
+- **Parametri**: url, data, headers, auth, contentType, timeout, followRedirects, insecure, cookieJar
 
 ### 3. http_put
 
 Esegue richieste HTTP PUT
 
-- **Parametri**: url, data, headers, auth, contentType, timeout, followRedirects, insecure
+- **Parametri**: url, data, headers, auth, contentType, timeout, followRedirects, insecure, cookieJar
 
 ### 4. http_delete
 
 Esegue richieste HTTP DELETE
 
-- **Parametri**: url, headers, auth, timeout, followRedirects, insecure
+- **Parametri**: url, headers, auth, timeout, followRedirects, insecure, cookieJar
 
-### 5. http_head
+### 5. http_patch
+
+Esegue richieste HTTP PATCH
+
+- **Parametri**: url, data, headers, auth, contentType, timeout, followRedirects, insecure, cookieJar
+
+### 6. http_head
 
 Esegue richieste HTTP HEAD
 
-- **Parametri**: url, headers, auth, timeout, followRedirects, insecure
+- **Parametri**: url, headers, auth, timeout, followRedirects, insecure, cookieJar
 
-### 6. curl_custom
+### 7. curl_custom
 
 Esegue comandi curl personalizzati
 
 - **Parametri**: args (array di argomenti curl)
 
-### 7. http_upload
+### 8. http_upload
 
 Carica file tramite HTTP POST
 
-- **Parametri**: url, filePath, fieldName, headers, auth, timeout, insecure
+- **Parametri**: url, filePath, fieldName, headers, auth, timeout, insecure, cookieJar
 
-### 8. http_download
+### 9. http_download
 
 Scarica file tramite HTTP GET
 
-- **Parametri**: url, outputPath, headers, auth, timeout, followRedirects, insecure
+- **Parametri**: url, outputPath, headers, auth, timeout, followRedirects, insecure, cookieJar
 
-### 9. auth_test
+### 10. auth_test
 
 Testa i metodi di autenticazione
 
@@ -158,6 +165,30 @@ Testa i metodi di autenticazione
   "header": "Authorization: Custom token123"
 }
 ```
+
+## Cookie Jar per Gestione Sessioni
+
+Il server supporta la gestione persistente dei cookie tramite cookie jar, utile per mantenere sessioni HTTP tra più richieste.
+
+### Utilizzo
+
+Specifica il parametro `cookieJar` con il percorso di un file che verrà usato per salvare e caricare i cookie:
+
+```json
+{
+  "tool": "http_get",
+  "arguments": {
+    "url": "https://example.com/api/protected",
+    "cookieJar": "/tmp/session-cookies.txt"
+  }
+}
+```
+
+Il cookie jar:
+- Salva automaticamente i cookie ricevuti dal server
+- Riutilizza i cookie nelle richieste successive
+- Permette di mantenere sessioni autenticate senza dover passare token ad ogni richiesta
+- È compatibile con il formato Netscape cookie file usato da curl
 
 ## Configurazione per Client MCP
 
